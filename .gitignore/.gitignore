@@ -1,0 +1,11 @@
+# ignore all .bat, .log files
+
+# *.bat
+*.log
+
+# only ignore the TODO file in the current directory, not subdir/TODO
+
+/target
+/packages
+/img
+# /font
