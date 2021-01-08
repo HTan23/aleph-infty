@@ -8,4 +8,5 @@
 /target
 /packages
 /img
+# /.*
 # /font
