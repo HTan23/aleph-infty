@@ -11,6 +11,12 @@
             "url": "http://localhost:8000/${workspaceFolderBasename}",
         },
         {
+            "name": "Single File Local Host",
+            "request": "launch",
+            "type": "pwa-chrome",
+            "url": "http://localhost:8000/${workspaceFolderBasename}/${fileBasename}",
+        },
+        {
             "name": "Launch Chrome",
             "type": "chrome",
             "request": "launch",
