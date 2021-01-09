@@ -16,6 +16,7 @@
     </div>
     <div id="container"></div>
     
+    <script src="script/dat.gui.min.js"></script>
     <script type="module">
         
         import * as THREE from 'https://unpkg.com/three/build/three.module.js';
@@ -23,7 +24,7 @@
         import { OrbitControls } from 'https://unpkg.com/three/examples/jsm/controls/OrbitControls.js';
         import { DeviceOrientationControls } from 'https://unpkg.com/three/examples/jsm/controls/DeviceOrientationControls.js';
 
-        let renderer, scene, camera, controls;
+        let renderer, scene, camera, controls, gui;
 
         let mesh, geometry;
         
@@ -35,9 +36,12 @@
 
         const DIMS = [ WIDTH, HEIGHT, DEPTH ];
 
-        const GRAVITY_CONSTANT = 300;
-        const BOUNCE_LOSS = 0.1;
+        const GRAVITY_CONSTANT = 1000;
         const RADIUS = 40;
+
+        const options = {
+            bounceLoss: 0.1,
+        }
         
         const pos = new THREE.Vector3( -300, -200, -100 );
         const vel = new THREE.Vector3();
@@ -143,6 +147,10 @@
 
             window.addEventListener( 'resize', onWindowResize, false );
 
+            gui = new dat.GUI();
+
+            gui.add( options, 'bounceLoss', 0.0, 1.0, 0.01);
+            
             timestamp = new Date();
         }
 
@@ -193,13 +201,13 @@
             for ( let i = 0; i < 3; i++ ) {
                 // calculate
                 let newVel = vel.getComponent( i ) + acc.getComponent( i ) * delta;
-                let newPos = pos.getComponent( i ) + vel.getComponent( i ) * delta;
+                let newPos = pos.getComponent( i ) + newVel * delta;
                 
                 // reflect
                 const d = DIMS[ i ];
                 if (Math.abs( newPos ) >= d / 2 - RADIUS)
                 {
-                    newVel *= -( 1 - BOUNCE_LOSS );
+                    newVel *= -( 1 - options.bounceLoss );
                     newPos = (d - 2 * RADIUS) * Math.sign( newPos ) - newPos;
                 }
 
