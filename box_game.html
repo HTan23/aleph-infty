@@ -217,15 +217,16 @@
         }
 
         function checkReturned() {
-            
-            const angle = camera.position.angleTo( INIT );
 
-            const distance = camera.position.length() / DISTANCE - 1;
-            
+            const xw = new THREE.Vector3( 1, 0, 0 ).applyEuler( camera.rotation );
+            const yw = new THREE.Vector3( 0, 1, 0 ).applyEuler( camera.rotation );
+            const zw = new THREE.Vector3( 0, 0, 1 ).applyEuler( camera.rotation );
+            // ( down @ xw, down @ yw, down @ zw )
+            const downLocal = new THREE.Vector3( -xw.y, -yw.y, -zw.y );
             document.getElementById( "sub-info" ).innerText =
-            toString( camera.rotation ) +
-            "\r" + toString( camera.up ) +
-            "\r" + toString( new THREE.Vector3(0, 1, 0).applyEuler( camera.rotation ) )
+            toString( camera.position ) +
+            "\r" + toString( camera.rotation ) +
+            "\r" + toString( downLocal )
 
             // if ( controls.enabled ) {
 
