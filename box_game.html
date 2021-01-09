@@ -40,12 +40,12 @@
         const RADIUS = 40;
 
         const options = {
-            bounceLoss: 0.1,
+            bounceLoss: 0.0,
         }
         
         const pos = new THREE.Vector3( -300, -200, -100 );
         const vel = new THREE.Vector3();
-        const acc = new THREE.Vector3();
+        const acc = new THREE.Vector3( 0, -GRAVITY_CONSTANT, 0 );
 
         const orientationCamera = new THREE.PerspectiveCamera( 60, WIDTH / HEIGHT, 1, 1000 );
         const orientationControls = new DeviceOrientationControls( orientationCamera );
@@ -201,14 +201,21 @@
             for ( let i = 0; i < 3; i++ ) {
                 // calculate
                 let newVel = vel.getComponent( i ) + acc.getComponent( i ) * delta;
-                let newPos = pos.getComponent( i ) + newVel * delta;
+                let newPos = pos.getComponent( i ) + (newVel + vel.getComponent( i )) / 2 * delta;
                 
                 // reflect
                 const d = DIMS[ i ];
                 if (Math.abs( newPos ) >= d / 2 - RADIUS)
                 {
-                    newVel *= -( 1 - options.bounceLoss );
+                    const oldPos = newPos;
                     newPos = (d - 2 * RADIUS) * Math.sign( newPos ) - newPos;
+                    
+                    const deltaEp = -acc.getComponent( i ) * ( newPos - oldPos );
+                    const newEk = newVel * newVel - deltaEp * 2;
+
+                    newVel = Math.sign( newVel ) * Math.sqrt( newEk < 0 ? 0 : newEk )
+                    newVel *= -( 1 - options.bounceLoss );
+
                 }
 
                 // update
@@ -216,12 +223,17 @@
                 pos.setComponent( i, newPos );
             }
 
-
+            const Ek = 0.5 * vel.lengthSq() / 1000;
+            const Ep = -acc.dot( pos ) / 1000 + 200;
+            
             document.getElementById( "sub-info" ).innerText =
             toString( downLocal ) +
             "\r" + toString( pos ) +
-            "\r" + toString( vel ) +
-            "\r" + toString( acc )
+            " " + toString( vel ) +
+            " " + toString( acc ) +
+            "\r" + round( Ek, 3 ) +
+            ", " + round( Ep, 3 ) +
+            "\r" + round( Ek + Ep, 3 )
 
             mesh.position.copy( pos );
 
