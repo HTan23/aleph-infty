@@ -8,9 +8,9 @@
 </head>
 
 <body>
-    <!-- <div id="overlay">
+    <div id="overlay">
         <button id="startButton">Start</button>
-    </div> -->
+    </div>
     <div id="info">Box Garden
         <div id="sub-info" style="display: block;"></div>
     </div>
@@ -46,18 +46,18 @@
         const orientationCamera = new THREE.PerspectiveCamera( 60, WIDTH / HEIGHT, 1, 1000 );
         const orientationControls = new DeviceOrientationControls( orientationCamera );
 
-        // const startButton = document.getElementById( 'startButton' );
-        // startButton.addEventListener( 'click', function() {
+        const startButton = document.getElementById( 'startButton' );
+        startButton.addEventListener( 'click', function() {
 
             init();
             animate();
 
-        // }, false );
+        }, false );
 
         function init() {
             
-            // const overlay = document.getElementById( 'overlay' );
-            // overlay.remove();
+            const overlay = document.getElementById( 'overlay' );
+            overlay.remove();
             
             // scene
             
