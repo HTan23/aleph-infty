@@ -28,7 +28,7 @@
 
         let mesh, geometry;
         
-        let timestamp, physics;
+        let timestamp, audio;
 
         const WIDTH = window.innerWidth;
         const HEIGHT = window.innerHeight;
@@ -43,7 +43,7 @@
             bounceLoss: 0.0,
         }
         
-        const pos = new THREE.Vector3( -300, -200, -100 );
+        const pos = new THREE.Vector3( -300, HEIGHT / 2 * 0.9, -100 );
         const vel = new THREE.Vector3();
         const acc = new THREE.Vector3( 0, -GRAVITY_CONSTANT, 0 );
 
@@ -72,6 +72,8 @@
             renderer = new THREE.WebGLRenderer();
             renderer.setPixelRatio( window.devicePixelRatio );
             renderer.setSize( WIDTH, HEIGHT );
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
             
 			const textureLoader = new THREE.TextureLoader();
             
@@ -80,6 +82,9 @@
             camera.position.z = HEIGHT / 2 / Math.tan( fov / 2 / 180 * Math.PI ) + DEPTH / 2;
             camera.lookAt( 0, 0, -1 );
             camera.updateProjectionMatrix();
+
+			const listener = new THREE.AudioListener();
+			camera.add( listener );
 
             controls = new OrbitControls( camera, renderer.domElement );
             controls.enabled = false;
@@ -99,6 +104,7 @@
 
             } );
             const boxMesh = new THREE.Mesh( box, boxMaterial );
+            boxMesh.receiveShadow = true;
             scene.add( boxMesh );
 
             geometry = new THREE.SphereBufferGeometry( RADIUS, 60, 30 );
@@ -111,6 +117,8 @@
                 metalness: 0.0,
                 roughness: 0.1,
                 clearcoat: 1.0,
+
+
                 normalMap: normalMap,
                 clearcoatNormalMap: clearcoatNormaMap,
 
@@ -123,23 +131,54 @@
             //     specular: 0x2194ce,
             //     shininess: 20,
             // } );
+            
 
             mesh = new THREE.Mesh( geometry, material );
             mesh.position.copy( pos );
+            mesh.castShadow = true;
+
             scene.add( mesh );
+
+			const audioLoader = new THREE.AudioLoader();
+            // create objects when audio buffer is loaded
+
+            audioLoader.load( 'sound/ping_pong.mp3', function ( buffer ) {
+
+                audio = new THREE.PositionalAudio( listener );
+                audio.setBuffer( buffer );
+                audio.setVolume( 100 );
+
+            } );
 
 
             // lights
             const margin = 20;
-            const light00 = new THREE.PointLight( 0xff8080, 0.5 );
+            const light00 = new THREE.PointLight( 0xffc0c0, 0.8 );
             light00.position.set( WIDTH / -2 + margin, HEIGHT / -2 + margin, 100 ); //DEPTH / 2 - margin );
-            const light01 = new THREE.PointLight( 0x80ff80, 0.5 );
-            light01.position.set( WIDTH / 2 - margin, HEIGHT / -2 + margin, 100 ); //DEPTH / 2 - margin );
-            const light11 = new THREE.PointLight( 0xff8080, 0.5 );
+            // const light01 = new THREE.PointLight( 0xc0ffc0, 0.5 );
+            // light01.position.set( WIDTH / 2 - margin, HEIGHT / -2 + margin, 100 ); //DEPTH / 2 - margin );
+            const light11 = new THREE.PointLight( 0xffffc0, 0.8 );
             light11.position.set( WIDTH / 2 - margin, HEIGHT / 2 - margin, 100 ); //DEPTH / 2 - margin );
-            const light10 = new THREE.PointLight( 0x80ff80, 0.5 );
-            light10.position.set( WIDTH / -2 + margin, HEIGHT / 2 - margin, 100 ); //DEPTH / 2 - margin );
-            scene.add( light00, light01, light11, light10 );
+            // const light10 = new THREE.PointLight( 0xffffff, 0.5 );
+            // light10.position.set( WIDTH / -2 + margin, HEIGHT / 2 - margin, 100 ); //DEPTH / 2 - margin );
+            
+            // for (const light of [ light00, light01, light11, light10 ]) {
+            for (const light of [ light00, light11 ]) {
+                light.castShadow = true;
+                light.shadow.camera.near = 1;
+                light.shadow.camera.far = 8000;
+                light.shadow.camera.bias = 8000;
+
+                const g = new THREE.SphereBufferGeometry( 10, 30, 15 );
+                const ma = new THREE.MeshBasicMaterial( { color: light.color } );
+                ma.color.multiplyScalar( 3 );
+                const m = new THREE.Mesh( g, ma );
+                m.position.copy( light.position );
+                light.position.set( 0, 0, 0);
+                m.add( light );
+                
+                scene.add( m );
+            }
 
             
             const container = document.getElementById( 'container' );
@@ -216,6 +255,11 @@
                     newVel = Math.sign( newVel ) * Math.sqrt( newEk < 0 ? 0 : newEk )
                     newVel *= -( 1 - options.bounceLoss );
 
+                    if ( audio !== undefined && Math.abs( newVel ) > 100 )
+                    {
+                        audio.setVolume( newVel * newVel / 128 );
+                        audio.play(); // play audio with perfect timing when ball hits the surface
+                    }
                 }
 
                 // update
