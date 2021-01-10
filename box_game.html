@@ -28,7 +28,8 @@
 
         let mesh, geometry;
         
-        let timestamp, audio;
+        // let timestamp;
+        let audio;
 
         const WIDTH = window.innerWidth;
         const HEIGHT = window.innerHeight;
@@ -190,7 +191,7 @@
 
             gui.add( options, 'bounceLoss', 0.0, 1.0, 0.01);
             
-            timestamp = new Date();
+            // timestamp = new Date();
         }
 
         function randomDouble(abs = 10) {
@@ -233,7 +234,8 @@
             // ( down @ xw, down @ yw, down @ zw )
             const downLocal = new THREE.Vector3( -xw.y, -yw.y, -zw.y );
             
-            const delta = ( new Date() - timestamp ) / 1000;
+            // const delta = ( new Date() - timestamp ) / 1000;
+            const delta = 0.016;
             
             acc.copy( downLocal ).multiplyScalar( GRAVITY_CONSTANT );
 
@@ -281,7 +283,7 @@
 
             mesh.position.copy( pos );
 
-            timestamp = new Date();
+            // timestamp = new Date();
 
         }
 
