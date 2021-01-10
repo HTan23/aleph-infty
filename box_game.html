@@ -273,7 +273,8 @@
             const Ep = -acc.dot( pos ) / 1000 + 200;
             
             document.getElementById( "sub-info" ).innerText =
-            toString( downLocal ) +
+            orientationControls.enabled +
+            " " + toString( downLocal ) +
             "\r" + toString( pos ) +
             " " + toString( vel ) +
             " " + toString( acc ) +
