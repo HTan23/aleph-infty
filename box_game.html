@@ -12,7 +12,7 @@
         <button id="startButton">Start</button>
     </div>
     <div id="info">Box Garden
-        <div id="sub-info" style="display: block;"></div>
+        <div id="sub-info" style="display: none;"></div>
     </div>
     <div id="container"></div>
     
@@ -38,16 +38,17 @@
 
         const DIMS = [ WIDTH, HEIGHT, DEPTH ];
 
-        const GRAVITY_CONSTANT = 1000;
+        // const GRAVITY_CONSTANT = 1000;
         const RADIUS = 40;
 
         const options = {
             bounceLoss: 0.0,
+            gravityConstant: 1000,
         }
         
         const pos = new THREE.Vector3( -300, HEIGHT / 2 * 0.9, -100 );
         const vel = new THREE.Vector3();
-        const acc = new THREE.Vector3( 0, -GRAVITY_CONSTANT, 0 );
+        const acc = new THREE.Vector3( 0, -options.gravityConstant, 0 );
 
 
         const startButton = document.getElementById( 'startButton' );
@@ -193,6 +194,7 @@
             gui = new dat.GUI();
 
             gui.add( options, 'bounceLoss', 0.0, 1.0, 0.01);
+            gui.add( options, 'gravityConstant', 500, 10000, 100);
             
             // timestamp = new Date();
         }
@@ -243,7 +245,7 @@
             // const delta = ( new Date() - timestamp ) / 1000;
             const delta = 0.016;
             
-            acc.copy( downLocal ).multiplyScalar( GRAVITY_CONSTANT );
+            acc.copy( downLocal ).multiplyScalar( options.gravityConstant );
 
             for ( let i = 0; i < 3; i++ ) {
                 // calculate
