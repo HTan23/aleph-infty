@@ -25,6 +25,7 @@
         import { DeviceOrientationControls } from 'https://unpkg.com/three/examples/jsm/controls/DeviceOrientationControls.js';
 
         let renderer, scene, camera, controls, gui;
+        let orientationCamera, orientationControls;
 
         let mesh, geometry;
         
@@ -48,8 +49,6 @@
         const vel = new THREE.Vector3();
         const acc = new THREE.Vector3( 0, -GRAVITY_CONSTANT, 0 );
 
-        const orientationCamera = new THREE.PerspectiveCamera( 60, WIDTH / HEIGHT, 1, 1000 );
-        const orientationControls = new DeviceOrientationControls( orientationCamera );
 
         const startButton = document.getElementById( 'startButton' );
         startButton.addEventListener( 'click', function() {
@@ -83,6 +82,10 @@
             camera.position.z = HEIGHT / 2 / Math.tan( fov / 2 / 180 * Math.PI ) + DEPTH / 2;
             camera.lookAt( 0, 0, -1 );
             camera.updateProjectionMatrix();
+
+            
+            orientationCamera = new THREE.PerspectiveCamera( 60, WIDTH / HEIGHT, 1, 1000 );
+            orientationControls = new DeviceOrientationControls( orientationCamera );
 
 			const listener = new THREE.AudioListener();
 			camera.add( listener );
