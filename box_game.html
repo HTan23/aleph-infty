@@ -222,6 +222,9 @@
             else if ( vec instanceof THREE.Euler ) {
                 return `${ vec.order }( ${ round( vec.x, decimal ) }, ${ round( vec.y, decimal ) }, ${ round( vec.z, decimal ) } )`;
             }
+            else if ( vec instanceof DeviceOrientationEvent ) {
+                return `${ vec.isTrusted ? "Trusted" : "Untrusted" } ( ${ round( vec.alpha, decimal ) }, ${ round( vec.beta, decimal ) }, ${ round( vec.gamma, decimal ) } )`;
+            }
         }
 
         function updateInfo() {
@@ -276,8 +279,8 @@
             const Ep = -acc.dot( pos ) / 1000 + 200;
             
             document.getElementById( "sub-info" ).innerText =
-            orientationControls.enabled +
-            " " + toString( downLocal ) +
+            toString( orientationControls.deviceOrientation ) +
+            "\r" + toString( downLocal ) +
             "\r" + toString( pos ) +
             " " + toString( vel ) +
             " " + toString( acc ) +
