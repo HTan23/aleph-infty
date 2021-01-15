@@ -200,6 +200,10 @@
         import { OrbitControls } from 'https://unpkg.com/three/examples/jsm/controls/OrbitControls.js';
         import { GPUComputationRenderer } from 'https://unpkg.com/three/examples/jsm/misc/GPUComputationRenderer.js';
 
+        import { UnrealBloomPass } from 'https://unpkg.com/three/examples/jsm/postprocessing/UnrealBloomPass.js';
+        import { EffectComposer } from 'https://unpkg.com/three/examples/jsm/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'https://unpkg.com/three/examples/jsm/postprocessing/RenderPass.js';
+        
 
         const isIE = /Trident/i.test( navigator.userAgent );
         const isEdge = /Edge/i.test( navigator.userAgent );
@@ -210,7 +214,7 @@
         const RATIO = 0.2;
 
         let container, stats;
-        let camera, scene, renderer, geometry, boxEdges;
+        let camera, scene, renderer, geometry, boxEdges, composer;
 
         const PARTICLES = WIDTH * WIDTH;
 
@@ -219,15 +223,24 @@
         let positionVariable;
         let velocityUniforms;
         let particleUniforms;
+        
         let effectController;
+        const bloomController = {
+            // Bloom effect
+            exposure: 1.0,
+            bloomStrength: 0.7,
+            bloomThreshold: 0.1,
+            bloomRadius: 0.1,
+        }
+
+        let bloomPass;
 
         init();
         animate();
 
         function init() {
 
-            container = document.createElement( 'div' );
-            document.body.appendChild( container );
+            container = document.getElementById( 'container' );
 
             camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 5, 15000 );
             camera.position.y = 300;
@@ -238,7 +251,21 @@
             renderer = new THREE.WebGLRenderer();
             renderer.setPixelRatio( window.devicePixelRatio );
             renderer.setSize( window.innerWidth, window.innerHeight );
+            renderer.toneMapping = THREE.ReinhardToneMapping;
+            renderer.toneMappingExposure = Math.pow(bloomController.exposure, 4.0);
+
             container.appendChild( renderer.domElement );
+            
+            const renderScene = new RenderPass( scene, camera );
+
+            bloomPass = new UnrealBloomPass( new THREE.Vector2( window.innerWidth, window.innerHeight ), 1.5, 0.4, 0.85 );
+            bloomPass.threshold = bloomController.bloomThreshold;
+            bloomPass.strength = bloomController.bloomStrength;
+            bloomPass.radius = bloomController.bloomRadius;
+
+            composer = new EffectComposer( renderer );
+            composer.addPass( renderScene );
+            composer.addPass( bloomPass );
 
             const controls = new OrbitControls( camera, renderer.domElement );
             controls.minDistance = 100;
@@ -264,7 +291,6 @@
             const boxMaterial = new THREE.LineBasicMaterial( {
                 
                 color: 0x00ffff,
-                linewidth: 10,
 
             } );
 
@@ -491,8 +517,26 @@
 
             folder2.add( buttonRestart, 'restartSimulation' );
 
+            const folder3 = gui.addFolder("Blooming Effect");
+            folder3.add(bloomController, 'exposure', 0.1, 2).onChange(function (value) {
+                renderer.toneMappingExposure = Math.pow(value, 4.0);
+            });
+
+            folder3.add( bloomController, 'bloomThreshold', 0.0, 1.0 ).step( 0.01 ).onChange( function (value) {
+                bloomPass.threshold = Number(value);
+            });
+
+            folder3.add( bloomController, 'bloomStrength', 0.0, 3.0 ).onChange( function (value) {
+                bloomPass.strength = Number(value);
+            });
+
+            folder3.add( bloomController, 'bloomRadius', 0.0, 1.0 ).step( 0.01 ).onChange( function (value) {
+                bloomPass.radius = Number(value);
+            });
+
             folder1.open();
             folder2.open();
+            folder3.open();
             
             gui.open();
 
@@ -527,7 +571,9 @@
             particleUniforms[ "texturePosition" ].value = gpuCompute.getCurrentRenderTarget( positionVariable ).texture;
             particleUniforms[ "textureVelocity" ].value = gpuCompute.getCurrentRenderTarget( velocityVariable ).texture;
 
-            renderer.render( scene, camera );
+            // renderer.render( scene, camera );
+
+            composer.render();
 
         }
 
