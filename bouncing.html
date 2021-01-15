@@ -48,7 +48,7 @@
         #include <common>
 
         #define delta ( 1.0 / 60.0 )
-        #define posComp ( 2.0 )
+        #define posComp ( 1.0 )
 
         uniform float boxLength;
         uniform float boxWidth;
@@ -95,7 +95,7 @@
                     float radius2 = tmpVel2.w;
                     float mass2 = radius2 * radius2 * radius2;
 
-                    vec3 dPos = pos - pos2;
+                    vec3 dPos = pos - pos2 + ( vel - vel2 ) * delta * 2.0;
                     float distance = length( dPos );
                     dPos /= distance;
 
@@ -128,9 +128,9 @@
 
             // Box Collision
 
-            if ( abs( pos.x ) > boxLength / 2.0 - radius ) vel.x = -vel.x * 1.0;
-            if ( abs( pos.y ) > boxWidth / 2.0 - radius ) vel.y = -vel.y * 1.0;
-            if ( abs( pos.z ) > boxHeight / 2.0 - radius ) vel.z = -vel.z * 1.0;
+            if ( abs( pos.x ) > boxLength / 2.0 - radius && pos.x * vel.x > 0.0 ) vel.x = -vel.x * 1.0;
+            if ( abs( pos.y ) > boxWidth / 2.0 - radius && pos.y * vel.y > 0.0 ) vel.y = -vel.y * 1.0;
+            if ( abs( pos.z ) > boxHeight / 2.0 - radius && pos.z * vel.z > 0.0 ) vel.z = -vel.z * 1.0;
             
             gl_FragColor = vec4( vel, radius );
 
@@ -197,6 +197,10 @@
         
         import * as THREE from 'https://unpkg.com/three/build/three.module.js';
 
+        import { LineSegmentsGeometry } from 'https://unpkg.com/three/examples/jsm/lines/LineSegmentsGeometry.js';
+        import { LineMaterial } from 'https://unpkg.com/three/examples/jsm/lines/LineMaterial.js';
+        import { LineSegments2 } from 'https://unpkg.com/three/examples/jsm/lines/LineSegments2.js';
+
         import { OrbitControls } from 'https://unpkg.com/three/examples/jsm/controls/OrbitControls.js';
         import { GPUComputationRenderer } from 'https://unpkg.com/three/examples/jsm/misc/GPUComputationRenderer.js';
 
@@ -214,7 +218,8 @@
         const RATIO = 0.2;
 
         let container, stats;
-        let camera, scene, renderer, geometry, boxEdges, composer;
+        let camera, scene, renderer, geometry, composer;
+        let box, boxMaterial;
 
         const PARTICLES = WIDTH * WIDTH;
 
@@ -286,17 +291,19 @@
 
             initComputeRenderer();
 
-            const box = new THREE.BoxBufferGeometry( 1, 1, 1 );
-            const edge = new THREE.EdgesGeometry( box );
-            const boxMaterial = new THREE.LineBasicMaterial( {
+            const boxGeometryOriginal = new THREE.EdgesGeometry( new THREE.BoxBufferGeometry( 1, 1, 1 ) );
+            const boxGeometry = new LineSegmentsGeometry().fromEdgesGeometry( boxGeometryOriginal );
+            boxMaterial = new LineMaterial( {
                 
-                color: 0x00ffff,
+                color: 0x00ffee,
+                linewidth: 5,
+                dashed: false,
 
             } );
 
-            boxEdges = new THREE.LineSegments( edge, boxMaterial );
-            boxEdges.scale.set( effectController.boxLength, effectController.boxWidth, effectController.boxHeight );
-            scene.add( boxEdges );
+            box = new LineSegments2( boxGeometry, boxMaterial );
+            box.scale.set( effectController.boxLength, effectController.boxWidth, effectController.boxHeight );
+            scene.add( box );
 
             stats = new Stats();
             container.appendChild( stats.dom );
@@ -371,7 +378,7 @@
             velocityUniforms[ "boxWidth" ].value = effectController.boxWidth;
             velocityUniforms[ "boxHeight" ].value = effectController.boxHeight;
 
-            boxEdges.scale.set( effectController.boxLength, effectController.boxWidth, effectController.boxHeight );
+            box.scale.set( effectController.boxLength, effectController.boxWidth, effectController.boxHeight );
 
             // velocityUniforms[ "fieldSourcePosition" ].value = effectController.fieldSourcePosition;
             // velocityUniforms[ "fieldMagnitude" ].value = effectController.fieldMagnitude;
@@ -572,6 +579,9 @@
             particleUniforms[ "textureVelocity" ].value = gpuCompute.getCurrentRenderTarget( velocityVariable ).texture;
 
             // renderer.render( scene, camera );
+
+            // renderer will set this eventually
+            boxMaterial.resolution.set( window.innerWidth, window.innerHeight ); // resolution of the viewport
 
             composer.render();
 
