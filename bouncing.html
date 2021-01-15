@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Bouncing Particles In Box</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <link rel="stylesheet" type="text/css" href="style/threejs-style.css">
+</head>
+
+<body>
+    <!-- <div id="overlay">
+        <button id="startButton">Start</button>
+    </div> -->
+    <div id="info">Bouncing Particles In Box
+        <div id="sub-info" style="display: none;"></div>
+    </div>
+    <div id="container"></div>
+
+
+    <!-- Fragment shader for particles's position -->
+    <script id="computeShaderPosition" type="x-shader/x-fragment">
+
+        #define delta ( 1.0 / 60.0 )
+
+        void main() {
+
+            vec2 uv = gl_FragCoord.xy / resolution.xy;
+
+            vec4 tmpPos = texture2D( texturePosition, uv );
+            vec3 pos = tmpPos.xyz;
+            
+            vec4 tmpVel = texture2D( textureVelocity, uv );
+            vec3 vel = tmpVel.xyz;
+
+            // Dynamics
+            pos += vel * delta;
+
+            gl_FragColor = vec4( pos, 1.0 );
+
+        }
+
+    </script>
+
+    <!-- Fragment shader for particles's velocity -->
+    <script id="computeShaderVelocity" type="x-shader/x-fragment">
+
+        // For PI declaration:
+        #include <common>
+
+        #define delta ( 1.0 / 60.0 )
+        #define posComp ( 2.0 )
+
+        uniform float boxLength;
+        uniform float boxWidth;
+        uniform float boxHeight;
+
+        uniform vec3 fieldSourcePosition;
+        uniform float fieldMagnitude;
+
+        const float width = resolution.x;
+        const float height = resolution.y;
+
+        void main()	{
+
+            vec2 uv = gl_FragCoord.xy / resolution.xy;
+            float idParticle = uv.y * resolution.x + uv.x;
+
+            vec4 tmpVel = texture2D( textureVelocity, uv );
+            vec3 vel = tmpVel.xyz;
+            vec4 tmpPos = texture2D( texturePosition, uv );
+            vec3 pos = tmpPos.xyz + vel * delta * posComp;
+            
+            float radius = tmpVel.w;
+            float mass = radius * radius * radius;
+
+
+            // Ball Collision
+            for ( float y = 0.0; y < height; y++ ) {
+
+                for ( float x = 0.0; x < width; x++ ) {
+
+                    vec2 secondParticleCoords = vec2( x + 0.5, y + 0.5 ) / resolution.xy;
+                    
+                    float idParticle2 = secondParticleCoords.y * resolution.x + secondParticleCoords.x;
+
+                    if ( idParticle == idParticle2 ) {
+                        continue;
+                    }
+
+                    vec4 tmpVel2 = texture2D( textureVelocity, secondParticleCoords );
+                    vec3 vel2 = tmpVel2.xyz;
+                    vec4 tmpPos2 = texture2D( texturePosition, secondParticleCoords );
+                    vec3 pos2 = tmpPos2.xyz + vel2 * delta * posComp;
+                    
+                    float radius2 = tmpVel2.w;
+                    float mass2 = radius2 * radius2 * radius2;
+
+                    vec3 dPos = pos - pos2;
+                    float distance = length( dPos );
+                    dPos /= distance;
+
+
+                    // Checks collision
+
+                    if ( distance < radius + radius2 ) {
+
+                        // Two particles swap momentum.
+                        vel = vel - dPos * dot( vel - vel2, dPos ) * 2.0 * mass2 / ( mass + mass2 );
+
+                    }
+
+                }
+            }
+            
+            // Field source position
+            
+            vec3 fieldVec = fieldSourcePosition - pos;
+            float fieldVecLength = length( fieldVec );
+            fieldVec /= fieldVecLength * fieldVecLength * fieldVecLength;
+            
+            vec3 acceleration = fieldVec * fieldMagnitude * 100000.0;
+            
+            // acceleration += pos * -10.0;
+            
+            // Dynamics
+            vel += delta * acceleration;
+
+
+            // Box Collision
+
+            if ( abs( pos.x ) > boxLength / 2.0 - radius ) vel.x = -vel.x * 1.0;
+            if ( abs( pos.y ) > boxWidth / 2.0 - radius ) vel.y = -vel.y * 1.0;
+            if ( abs( pos.z ) > boxHeight / 2.0 - radius ) vel.z = -vel.z * 1.0;
+            
+            gl_FragColor = vec4( vel, radius );
+
+        }
+
+    </script>
+
+    <!-- Particles vertex shader -->
+    <script type="x-shader/x-vertex" id="particleVertexShader">
+
+        // For PI declaration:
+        #include <common>
+
+        uniform sampler2D texturePosition;
+        uniform sampler2D textureVelocity;
+
+        uniform float cameraConstant;
+
+        varying vec4 vColor;
+
+        void main() {
+
+            vec4 posTemp = texture2D( texturePosition, uv );
+            vec3 pos = posTemp.xyz;
+            
+            vec4 velTemp = texture2D( textureVelocity, uv );
+            vec3 vel = velTemp.xyz;
+            float radius = velTemp.w;
+
+            vColor = vec4( 1.0, length( vel ) * length( vel ) / 100000.0, 0.0, 1.0 );
+
+            vec4 mvPosition = modelViewMatrix * vec4( pos, 1.0 );
+
+            gl_PointSize = radius * cameraConstant / ( - mvPosition.z );
+            //gl_PointSize = 3.0;
+
+            gl_Position = projectionMatrix * mvPosition;
+
+        }
+
+    </script>
+
+    <!-- Particles fragment shader -->
+    <script type="x-shader/x-fragment" id="particleFragmentShader">
+
+        varying vec4 vColor;
+
+        void main() {
+
+            float f = length( gl_PointCoord - vec2( 0.5, 0.5 ) );
+            if ( f > 0.5 ) {
+                discard;
+            }
+            gl_FragColor = vColor;
+
+        }
+
+    </script>
+
+    
+    <script src="//mrdoob.github.io/stats.js/build/stats.min.js"></script>
+    <script src="script/dat.gui.min.js"></script>
+    <script type="module">
+        
+        import * as THREE from 'https://unpkg.com/three/build/three.module.js';
+
+        import { OrbitControls } from 'https://unpkg.com/three/examples/jsm/controls/OrbitControls.js';
+        import { GPUComputationRenderer } from 'https://unpkg.com/three/examples/jsm/misc/GPUComputationRenderer.js';
+
+
+        const isIE = /Trident/i.test( navigator.userAgent );
+        const isEdge = /Edge/i.test( navigator.userAgent );
+
+        // Texture width for simulation (each texel is a debris particle)
+        const WIDTH = ( isIE || isEdge ) ? 4 : 32;
+
+        const RATIO = 0.2;
+
+        let container, stats;
+        let camera, scene, renderer, geometry, boxEdges;
+
+        const PARTICLES = WIDTH * WIDTH;
+
+        let gpuCompute;
+        let velocityVariable;
+        let positionVariable;
+        let velocityUniforms;
+        let particleUniforms;
+        let effectController;
+
+        init();
+        animate();
+
+        function init() {
+
+            container = document.createElement( 'div' );
+            document.body.appendChild( container );
+
+            camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 5, 15000 );
+            camera.position.y = 300;
+            camera.position.z = 600;
+
+            scene = new THREE.Scene();
+
+            renderer = new THREE.WebGLRenderer();
+            renderer.setPixelRatio( window.devicePixelRatio );
+            renderer.setSize( window.innerWidth, window.innerHeight );
+            container.appendChild( renderer.domElement );
+
+            const controls = new OrbitControls( camera, renderer.domElement );
+            controls.minDistance = 100;
+            controls.maxDistance = 1000;
+
+            effectController = {
+                // Can be changed dynamically
+                fieldMagnitude: 0.0,
+
+                // Must restart simulation
+                boxLength: 300,
+                boxWidth: 400,
+                boxHeight: 500,
+
+                maxMass: 50.0,
+                velocity: 35,
+            };
+
+            initComputeRenderer();
+
+            const box = new THREE.BoxBufferGeometry( 1, 1, 1 );
+            const edge = new THREE.EdgesGeometry( box );
+            const boxMaterial = new THREE.LineBasicMaterial( {
+                
+                color: 0x00ffff,
+                linewidth: 10,
+
+            } );
+
+            boxEdges = new THREE.LineSegments( edge, boxMaterial );
+            boxEdges.scale.set( effectController.boxLength, effectController.boxWidth, effectController.boxHeight );
+            scene.add( boxEdges );
+
+            stats = new Stats();
+            container.appendChild( stats.dom );
+
+            window.addEventListener( 'resize', onWindowResize, false );
+
+            initGUI();
+
+            initParticles();
+
+        }
+
+        function initComputeRenderer() {
+
+            gpuCompute = new GPUComputationRenderer( WIDTH, WIDTH, renderer );
+
+            if ( isSafari() ) {
+
+                gpuCompute.setDataType( THREE.HalfFloatType );
+
+            }
+
+            const dtPosition = gpuCompute.createTexture();
+            const dtVelocity = gpuCompute.createTexture();
+
+            fillTextures( dtPosition, dtVelocity );
+
+            velocityVariable = gpuCompute.addVariable( "textureVelocity", document.getElementById( 'computeShaderVelocity' ).textContent, dtVelocity );
+            positionVariable = gpuCompute.addVariable( "texturePosition", document.getElementById( 'computeShaderPosition' ).textContent, dtPosition );
+
+            gpuCompute.setVariableDependencies( velocityVariable, [ positionVariable, velocityVariable ] );
+            gpuCompute.setVariableDependencies( positionVariable, [ positionVariable, velocityVariable ] );
+            
+            velocityUniforms = velocityVariable.material.uniforms;
+
+            velocityUniforms[ "boxLength" ] = { value: effectController.boxLength };
+            velocityUniforms[ "boxWidth" ] = { value: effectController.boxWidth };
+            velocityUniforms[ "boxHeight" ] = { value: effectController.boxHeight };
+
+            velocityUniforms[ "fieldSourcePosition" ] = { value: new THREE.Vector3( 0, 510, 0 ) };
+            velocityUniforms[ "fieldMagnitude" ] = { value: effectController.fieldMagnitude };
+
+            const error = gpuCompute.init();
+
+            if ( error !== null ) {
+
+                console.error( error );
+
+            }
+
+        }
+
+        function isSafari() {
+
+            return !! navigator.userAgent.match( /Safari/i ) && ! navigator.userAgent.match( /Chrome/i );
+
+        }
+
+        function restartSimulation() {
+
+            const dtPosition = gpuCompute.createTexture();
+            const dtVelocity = gpuCompute.createTexture();
+
+            fillTextures( dtPosition, dtVelocity );
+
+            gpuCompute.renderTexture( dtPosition, positionVariable.renderTargets[ 0 ] );
+            gpuCompute.renderTexture( dtPosition, positionVariable.renderTargets[ 1 ] );
+            gpuCompute.renderTexture( dtVelocity, velocityVariable.renderTargets[ 0 ] );
+            gpuCompute.renderTexture( dtVelocity, velocityVariable.renderTargets[ 1 ] );
+
+            velocityUniforms[ "boxLength" ].value = effectController.boxLength;
+            velocityUniforms[ "boxWidth" ].value = effectController.boxWidth;
+            velocityUniforms[ "boxHeight" ].value = effectController.boxHeight;
+
+            boxEdges.scale.set( effectController.boxLength, effectController.boxWidth, effectController.boxHeight );
+
+            // velocityUniforms[ "fieldSourcePosition" ].value = effectController.fieldSourcePosition;
+            // velocityUniforms[ "fieldMagnitude" ].value = effectController.fieldMagnitude;
+            
+        }
+
+        function initParticles() {
+
+            geometry = new THREE.BufferGeometry();
+
+            const positions = new Float32Array( PARTICLES * 3 );
+            let p = 0;
+
+            for ( let i = 0; i < PARTICLES; i ++ ) {
+
+                positions[ p ++ ] = ( Math.random() - 0.5 ) * RATIO * effectController.boxLength;
+                positions[ p ++ ] = ( Math.random() - 0.5 ) * RATIO * effectController.boxWidth;
+                positions[ p ++ ] = ( Math.random() - 0.5 ) * RATIO * effectController.boxHeight;
+
+            }
+
+            const uvs = new Float32Array( PARTICLES * 2 );
+            p = 0;
+
+            for ( let j = 0; j < WIDTH; j ++ ) {
+
+                for ( let i = 0; i < WIDTH; i ++ ) {
+
+                    uvs[ p ++ ] = i / ( WIDTH - 1 );
+                    uvs[ p ++ ] = j / ( WIDTH - 1 );
+
+                }
+
+            }
+
+            geometry.setAttribute( 'position', new THREE.BufferAttribute( positions, 3 ) );
+            geometry.setAttribute( 'uv', new THREE.BufferAttribute( uvs, 2 ) );
+
+            particleUniforms = {
+                "texturePosition": { value: null },
+                "textureVelocity": { value: null },
+                "cameraConstant": { value: getCameraConstant( camera ) },
+            };
+
+            // THREE.ShaderMaterial
+            const material = new THREE.ShaderMaterial( {
+                uniforms: particleUniforms,
+                vertexShader: document.getElementById( 'particleVertexShader' ).textContent,
+                fragmentShader: document.getElementById( 'particleFragmentShader' ).textContent
+            } );
+
+            material.extensions.drawBuffers = true;
+
+            const particles = new THREE.Points( geometry, material );
+            particles.matrixAutoUpdate = false;
+            particles.updateMatrix();
+
+            scene.add( particles );
+
+        }
+
+        function fillTextures( texturePosition, textureVelocity ) {
+
+            const posArray = texturePosition.image.data;
+            const velArray = textureVelocity.image.data;
+
+            const maxMass = effectController.maxMass * 8192 / PARTICLES;
+            const maxVel = effectController.velocity * 10;
+
+            const boxLength = effectController.boxLength;
+            const boxWidth = effectController.boxWidth;
+            const boxHeight = effectController.boxHeight;
+
+            function rand( mag = 1.0 ) {
+                return ( Math.random() - 0.5 ) * mag;
+            }
+
+            for ( let k = 0, kl = posArray.length; k < kl; k += 4 ) {
+
+                // Position
+                let x = rand( RATIO ) * boxLength;
+                let y = rand( RATIO ) * boxWidth;
+                let z = rand( RATIO ) * boxHeight;
+
+                // Velocity
+
+                const vx = rand() * maxVel;
+                const vy = rand() * maxVel;
+                const vz = rand() * maxVel;
+
+                const radius = Math.pow( Math.random() * maxMass + 1, 1.0 / 3.0 );
+
+                // Fill in texture values
+                posArray[ k + 0 ] = x;
+                posArray[ k + 1 ] = y;
+                posArray[ k + 2 ] = z;
+                posArray[ k + 3 ] = 1;
+
+                velArray[ k + 0 ] = vx;
+                velArray[ k + 1 ] = vy;
+                velArray[ k + 2 ] = vz;
+                velArray[ k + 3 ] = radius;
+
+            }
+
+        }
+
+        function onWindowResize() {
+
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+
+            renderer.setSize( window.innerWidth, window.innerHeight );
+
+            particleUniforms[ "cameraConstant" ].value = getCameraConstant( camera );
+
+        }
+
+        function initGUI() {
+
+            const gui = new dat.GUI( { width: 300 } );
+
+            const folder1 = gui.addFolder( 'Dynamic parameters' );
+
+            folder1.add( effectController, "fieldMagnitude", -100, 100, 10 ).onChange( dynamicChange );
+
+            const folder2 = gui.addFolder( 'Static parameters' );
+
+            folder2.add( effectController, "boxLength", 100, 500, 50 );
+            folder2.add( effectController, "boxWidth", 100, 500, 50 );
+            folder2.add( effectController, "boxHeight", 100, 500, 50 );
+
+            folder2.add( effectController, "maxMass", 1.0, 50.0, 0.1 );
+            folder2.add( effectController, "velocity", 0.0, 150.0, 0.1 );
+
+            const buttonRestart = {
+                restartSimulation: function () {
+
+                    restartSimulation();
+
+                }
+            };
+
+            folder2.add( buttonRestart, 'restartSimulation' );
+
+            folder1.open();
+            folder2.open();
+            
+            gui.open();
+
+        }
+
+        function dynamicChange( newVal ) {
+
+            velocityUniforms[ "fieldMagnitude" ].value = newVal;
+
+        }
+
+        function getCameraConstant( camera ) {
+
+            return window.innerHeight / ( Math.tan( THREE.MathUtils.DEG2RAD * 0.5 * camera.fov ) / camera.zoom );
+
+        }
+
+
+        function animate() {
+
+            requestAnimationFrame( animate );
+
+            render();
+            stats.update();
+
+        }
+
+        function render() {
+
+            gpuCompute.compute();
+
+            particleUniforms[ "texturePosition" ].value = gpuCompute.getCurrentRenderTarget( positionVariable ).texture;
+            particleUniforms[ "textureVelocity" ].value = gpuCompute.getCurrentRenderTarget( velocityVariable ).texture;
+
+            renderer.render( scene, camera );
+
+        }
+
+
+        function round( num, decimal ) {
+            const tens = Math.pow( 10, decimal );
+            return Math.round( num * tens ) / tens;
+        }
+
+        function toString( vec, decimal = 4 ) {
+            if ( vec instanceof THREE.Vector3 ) {
+                return `( ${ round( vec.x, decimal ) }, ${ round( vec.y, decimal ) }, ${ round( vec.z, decimal ) } )`;
+            }
+            else if ( vec instanceof THREE.Euler ) {
+                return `${ vec.order }( ${ round( vec.x, decimal ) }, ${ round( vec.y, decimal ) }, ${ round( vec.z, decimal ) } )`;
+            }
+            else if ( vec instanceof DeviceOrientationEvent ) {
+                return `${ vec.isTrusted ? "Trusted" : "Untrusted" } ( ${ round( vec.alpha, decimal ) }, ${ round( vec.beta, decimal ) }, ${ round( vec.gamma, decimal ) } )`;
+            }
+        }
+
+
+    </script>
+</body>
+
+</html>
