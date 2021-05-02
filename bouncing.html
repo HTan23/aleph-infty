@@ -195,18 +195,18 @@
     <script src="script/dat.gui.min.js"></script>
     <script type="module">
         
-        import * as THREE from 'https://unpkg.com/three/build/three.module.js';
+        import * as THREE from 'https://unpkg.com/three@0.127.0/build/three.module.js';
 
-        import { LineSegmentsGeometry } from 'https://unpkg.com/three/examples/jsm/lines/LineSegmentsGeometry.js';
-        import { LineMaterial } from 'https://unpkg.com/three/examples/jsm/lines/LineMaterial.js';
-        import { LineSegments2 } from 'https://unpkg.com/three/examples/jsm/lines/LineSegments2.js';
+        import { LineSegmentsGeometry } from 'https://unpkg.com/three@0.127.0/examples/jsm/lines/LineSegmentsGeometry.js';
+        import { LineMaterial } from 'https://unpkg.com/three@0.127.0/examples/jsm/lines/LineMaterial.js';
+        import { LineSegments2 } from 'https://unpkg.com/three@0.127.0/examples/jsm/lines/LineSegments2.js';
 
-        import { OrbitControls } from 'https://unpkg.com/three/examples/jsm/controls/OrbitControls.js';
-        import { GPUComputationRenderer } from 'https://unpkg.com/three/examples/jsm/misc/GPUComputationRenderer.js';
+        import { OrbitControls } from 'https://unpkg.com/three@0.127.0/examples/jsm/controls/OrbitControls.js';
+        import { GPUComputationRenderer } from 'https://unpkg.com/three@0.127.0/examples/jsm/misc/GPUComputationRenderer.js';
 
-        import { UnrealBloomPass } from 'https://unpkg.com/three/examples/jsm/postprocessing/UnrealBloomPass.js';
-        import { EffectComposer } from 'https://unpkg.com/three/examples/jsm/postprocessing/EffectComposer.js';
-        import { RenderPass } from 'https://unpkg.com/three/examples/jsm/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'https://unpkg.com/three@0.127.0/examples/jsm/postprocessing/UnrealBloomPass.js';
+        import { EffectComposer } from 'https://unpkg.com/three@0.127.0/examples/jsm/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'https://unpkg.com/three@0.127.0/examples/jsm/postprocessing/RenderPass.js';
         
 
         const isIE = /Trident/i.test( navigator.userAgent );
@@ -215,7 +215,7 @@
         // Texture width for simulation (each texel is a debris particle)
         const WIDTH = ( isIE || isEdge ) ? 4 : 32;
 
-        const RATIO = 0.2;
+        const RATIO = 0.4;
 
         let container, stats;
         let camera, scene, renderer, geometry, composer;
@@ -279,14 +279,18 @@
             effectController = {
                 // Can be changed dynamically
                 fieldMagnitude: 0.0,
-
+                
                 // Must restart simulation
                 boxLength: 300,
                 boxWidth: 400,
                 boxHeight: 500,
-
+                
                 maxMass: 50.0,
                 velocity: 35,
+
+                // Box parameters
+                boxColor: 0x00ffee,
+                lineWidth: 5,
             };
 
             initComputeRenderer();
@@ -295,8 +299,8 @@
             const boxGeometry = new LineSegmentsGeometry().fromEdgesGeometry( boxGeometryOriginal );
             boxMaterial = new LineMaterial( {
                 
-                color: 0x00ffee,
-                linewidth: 5,
+                color: effectController.boxColor,
+                linewidth: effectController.lineWidth,
                 dashed: false,
 
             } );
@@ -339,12 +343,12 @@
             
             velocityUniforms = velocityVariable.material.uniforms;
 
-            velocityUniforms[ "boxLength" ] = { value: effectController.boxLength };
-            velocityUniforms[ "boxWidth" ] = { value: effectController.boxWidth };
-            velocityUniforms[ "boxHeight" ] = { value: effectController.boxHeight };
+            velocityUniforms[ "boxLength" ] = {  value : effectController.boxLength };
+            velocityUniforms[ "boxWidth" ] = {  value : effectController.boxWidth };
+            velocityUniforms[ "boxHeight" ] = {  value : effectController.boxHeight };
 
-            velocityUniforms[ "fieldSourcePosition" ] = { value: new THREE.Vector3( 0, 510, 0 ) };
-            velocityUniforms[ "fieldMagnitude" ] = { value: effectController.fieldMagnitude };
+            velocityUniforms[ "fieldSourcePosition" ] = {  value : new THREE.Vector3( 0, 510, 0 ) };
+            velocityUniforms[ "fieldMagnitude" ] = {  value : effectController.fieldMagnitude };
 
             const error = gpuCompute.init();
 
@@ -418,9 +422,9 @@
             geometry.setAttribute( 'uv', new THREE.BufferAttribute( uvs, 2 ) );
 
             particleUniforms = {
-                "texturePosition": { value: null },
-                "textureVelocity": { value: null },
-                "cameraConstant": { value: getCameraConstant( camera ) },
+                "texturePosition": {  value : null },
+                "textureVelocity": {  value : null },
+                "cameraConstant": {  value : getCameraConstant( camera ) },
             };
 
             // THREE.ShaderMaterial
@@ -503,7 +507,9 @@
 
             const folder1 = gui.addFolder( 'Dynamic parameters' );
 
-            folder1.add( effectController, "fieldMagnitude", -100, 100, 10 ).onChange( dynamicChange );
+            folder1.add( effectController, "fieldMagnitude", -100, 100, 10 ).onChange( function ( newVal ) {
+                velocityUniforms[ "fieldMagnitude" ].value = newVal;
+            } );
 
             const folder2 = gui.addFolder( 'Static parameters' );
 
@@ -525,33 +531,38 @@
             folder2.add( buttonRestart, 'restartSimulation' );
 
             const folder3 = gui.addFolder("Blooming Effect");
-            folder3.add(bloomController, 'exposure', 0.1, 2).onChange(function (value) {
-                renderer.toneMappingExposure = Math.pow(value, 4.0);
+
+            folder3.add(bloomController, 'exposure', 0.1, 2).onChange( function ( value ) {
+                renderer.toneMappingExposure = Math.pow( value , 4.0);
             });
 
-            folder3.add( bloomController, 'bloomThreshold', 0.0, 1.0 ).step( 0.01 ).onChange( function (value) {
-                bloomPass.threshold = Number(value);
+            folder3.add( bloomController, 'bloomThreshold', 0.0, 1.0 ).step( 0.01 ).onChange( function ( value ) {
+                bloomPass.threshold = Number( value );
             });
 
-            folder3.add( bloomController, 'bloomStrength', 0.0, 3.0 ).onChange( function (value) {
-                bloomPass.strength = Number(value);
+            folder3.add( bloomController, 'bloomStrength', 0.0, 3.0 ).onChange( function ( value ) {
+                bloomPass.strength = Number( value );
             });
 
-            folder3.add( bloomController, 'bloomRadius', 0.0, 1.0 ).step( 0.01 ).onChange( function (value) {
-                bloomPass.radius = Number(value);
+            folder3.add( bloomController, 'bloomRadius', 0.0, 1.0 ).step( 0.01 ).onChange( function ( value ) {
+                bloomPass.radius = Number( value );
             });
+
+            const folder4 = gui.addFolder("Box Effect");
+
+            folder4.addColor( effectController, "boxColor" ).onChange( function ( newVal ) {
+                boxMaterial.color = new THREE.Color( newVal );
+            } );
+            folder4.add( effectController, "lineWidth", 1.0, 10.0 ).onChange( function ( newVal ) {
+                boxMaterial.linewidth = Number( newVal );
+            } );
 
             folder1.open();
             folder2.open();
             folder3.open();
             
-            gui.open();
+            gui.close();
 
-        }
-
-        function dynamicChange( newVal ) {
-
-            velocityUniforms[ "fieldMagnitude" ].value = newVal;
 
         }
 
